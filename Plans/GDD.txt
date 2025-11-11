@@ -1,0 +1,147 @@
+Mr. Snake: Across Dimensions
+
+🕹️ Gameplay
+
+Hráč ovládá hada (Mr. Snake), který se pohybuje po 2D mřížce.
+Úkolem je sbírat jídlo, vyhýbat se překážkám a nepřátelům, a procházet portály mezi různými úrovněmi a dimenzemi.
+
+Hra kombinuje klasický snake styl s prvky strategie a přežívání v různých realitách.
+Postupem času se mapa stává komplexnější — přidávají se portály, nepřátelé a “dimenzionální nestabilita”.
+
+⚙️ Mechanics
+🎯 Pohyb
+
+Pohyb po gridu (např. 20x20 px buňky).
+
+Ovládání pomocí šipek nebo WASD.
+
+Každý krok = pohyb o jednu buňku ve zvoleném směru.
+
+Nelze se otočit o 180° (např. jít zpět proti vlastnímu tělu).
+
+🍎 Jídlo
+
+Náhodný spawn na volné pozici.
+
+Po sebrání:
+
++1 délka těla
+
++1 skóre
+
+🌀 Portály
+
+Normální portály přenáší hráče na jiné místo v rámci stejné mapy.
+
+Level portál se objeví po splnění cíle (např. nasbírání určitého skóre).
+
+Dimenzionální portály přenáší hráče do paralelní dimenze.
+
+Přenos je doprovázen efektem “rozpadu reality” (rozmazání, glitch).
+
+👾 Nepřátelé
+
+Typy:
+
+Patrolující – chodí po určené trase.
+
+Náhodní – mění směr po čase.
+
+Lovci – sledují hráče, ale pomalu.
+
+Kontakt s nepřítelem = smrt.
+
+V dimenzi se mohou objevit noví, silnější nepřátelé.
+
+💎 Power-ups / Vylepšení
+
+V dimenzi může had najít speciální vylepšení, např.:
+
+🧠 Dimensional Vision – vidí nepřátele přes zdi.
+
+⚡ Speed Boost – krátkodobé zrychlení.
+
+🛡️ Phase Shift – jeden zásah tě nezabije.
+
+🎨 Art
+
+Styl: retro pixel art s moderními efekty (neon, světelné záře).
+
+Barvy světů:
+
+Normální svět → zeleno-modré tóny, světlé pozadí.
+
+Dimenze → fialovo-černá, glitch efekt, lehká mlha.
+
+Portály mají animovaný okraj (rotující textura nebo světelný puls).
+
+Nepřátelé se liší tvarem a barvou podle typu.
+
+Přechod mezi světy = krátká animace rozpadu.
+
+🎯 Cíl hry
+
+Přežít co nejdéle a získat co nejvyšší skóre.
+
+Dokončit všechny levely skrze portály.
+
+Strategicky využívat dimenze k přežití nebo vylepšení.
+
+Získávat bonusy a uniknout z “kolabující reality”.
+
+🚪 Začátek a konec
+Začátek:
+
+Intro obrazovka (logo Mr. Snake, krátká animace portálu).
+
+Menu:
+
+Start Game
+
+Controls
+
+Quit
+
+Hráč začne v první mapě (bez portálů, jen jídlo).
+
+Konec:
+
+Pokud had zemře → Game Over screen (skóre, možnost restartu).
+
+Po dokončení všech levelů → speciální finální animace, kde se dimenze spojí (efekt glitch kolapsu).
+
+🗺️ Level System
+
+Každý level má unikátní mapu, rozložení portálů a typy nepřátel.
+
+Level	Název	Popis	Nové prvky
+1	Awakening	Základní had, žádné portály	jídlo
+2	Shifting Paths	První portály	teleporty
+3	Dimensional Gate	První vstup do jiné dimenze	vylepšení
+4	The Mirror World	Obě dimenze propojené	dvě mapy paralelně
+5	Collapse	Dimenze se rozpadají	časový limit, glitch efekty
+🌀 Dimensional Logic
+Jak funguje přechod:
+
+Portál → přenos do alternativní kopie mapy.
+
+Všechno je stejné, ale barvy a světlo jsou jiné.
+
+“Staré” entity (tvé tělo, nepřátelé) jsou viditelné jako stíny.
+
+Oni tě nevidí, ale pohybují se dál podle své logiky.
+
+Co dává dimenze:
+
+Bezpečí před některými hrozbami.
+
+Nové výzvy – nebezpečnější enemies.
+
+Možnost získat vylepšení, která v normálním světě nejdou.
+
+Omezení:
+
+Časový limit pobytu v dimenzi (např. 20 sekund).
+
+Dlouhý pobyt způsobí “rozpad reality” – mapa se glitchuje, hráč může zemřít.
+
