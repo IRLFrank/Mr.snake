@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 
 namespace Mr.snake
-{
+{   
     public class Game1 : Game
     {
         private GraphicsDeviceManager _graphics;
@@ -20,6 +20,8 @@ namespace Mr.snake
 
         private bool _wasColliding = false;
         private Random _rnd = new Random();
+
+        private KeyboardState _previousKeyboardState; // Přidáno pro sledování předchozího stavu klávesnice
 
         public Game1()
         {
@@ -63,8 +65,6 @@ namespace Mr.snake
             if (kstate.IsKeyDown(Keys.Escape))
                 Exit();
 
-            float delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
             // --- Ovládání šipek ---
             Vector2 move = Vector2.Zero;
             if (kstate.IsKeyDown(Keys.Up)) move = new Vector2(0, -1);
@@ -72,36 +72,47 @@ namespace Mr.snake
             else if (kstate.IsKeyDown(Keys.Left)) move = new Vector2(-1, 0);
             else if (kstate.IsKeyDown(Keys.Right)) move = new Vector2(1, 0);
 
+            // Pokud je stisknutá šipka, nastav směr
             if (move != Vector2.Zero)
                 _dir = move;
 
-            // --- Pohyb hada ---
-            Vector2 newHead = _snake[0] + _dir * rychlost * delta;
-
-            // Okraje obrazovky
-            newHead.X = MathHelper.Clamp(newHead.X, 0, _graphics.PreferredBackBufferWidth - velikostctverecku);
-            newHead.Y = MathHelper.Clamp(newHead.Y, 0, _graphics.PreferredBackBufferHeight - velikostctverecku);
-
-            // Posuň tělo
-            for (int i = _snake.Count - 1; i > 0; i--)
-                _snake[i] = _snake[i - 1];
-            _snake[0] = newHead;
-
-            // --- Kolize s červeným čtverečkem ---
-            Rectangle rectRed = new Rectangle((int)_redPos.X, (int)_redPos.Y, velikostctverecku, velikostctverecku);
-            Rectangle rectHead = new Rectangle((int)_snake[0].X, (int)_snake[0].Y, velikostctverecku, velikostctverecku);
-
-            bool isColliding = rectRed.Intersects(rectHead);
-
-            if (isColliding && !_wasColliding)
+            // Pohyb hada pouze pokud je nějaká šipka stisknutá
+            if (move != Vector2.Zero)
             {
-                // Prodloužení hada o více segmentů (např. 3)
-                for (int i = 0; i < 3; i++)
-                    _snake.Add(_snake[_snake.Count - 1]);
-                // Nová pozice červeného čtverečku
-                _redPos = RandomRedPosition();
+                float delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
+                Vector2 newHead = _snake[0] + _dir * rychlost * delta;
+
+                // Okraje obrazovky
+                newHead.X = MathHelper.Clamp(newHead.X, 0, _graphics.PreferredBackBufferWidth - velikostctverecku);
+                newHead.Y = MathHelper.Clamp(newHead.Y, 0, _graphics.PreferredBackBufferHeight - velikostctverecku);
+
+                // Posuň tělo
+                for (int i = _snake.Count - 1; i > 0; i--)
+                    _snake[i] = _snake[i - 1];
+                _snake[0] = newHead;
+
+                // --- Kolize s červeným čtverečkem ---
+                Rectangle rectRed = new Rectangle((int)_redPos.X, (int)_redPos.Y, velikostctverecku, velikostctverecku);
+                Rectangle rectHead = new Rectangle((int)_snake[0].X, (int)_snake[0].Y, velikostctverecku, velikostctverecku);
+
+                bool isColliding = rectRed.Intersects(rectHead);
+
+                if (isColliding && !_wasColliding)
+                {
+                    // Prodloužení hada o více segmentů (např. 3)
+                    for (int i = 0; i < 3; i++)
+                        _snake.Add(_snake[_snake.Count - 1]);
+                    // Nová pozice červeného čtverečku
+                    _redPos = RandomRedPosition();
+                }
+                _wasColliding = isColliding;
             }
-            _wasColliding = isColliding;
+            else
+            {
+                _wasColliding = false; // Reset kolize, když se had nehýbe
+            }
+
+            _previousKeyboardState = kstate;
 
             base.Update(gameTime);
         }
