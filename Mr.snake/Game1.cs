@@ -4,31 +4,75 @@ using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
 
-namespace Mr.snake
-{   
+namespace MrSnake
+{
     public class Game1 : Game
     {
         private GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch;
-
         private Texture2D _pixel;
-        private Vector2 _redPos;
+
+        // Had
         private List<Vector2> _snake = new List<Vector2>();
-        private Vector2 _dir = new Vector2(1, 0); // výchozí směr doprava
-        private const int velikostctverecku = 40;
-        private const float rychlost = 200f;
+        private Vector2 _dir = new Vector2(1, 0);
+        private const int size = 40;
+        private const float speed = 200f;
 
+        // Jídlo
+        private Vector2 _redPos;
+        private Vector2 _yellowPos;
+        private float _yellowTimer = 0f;
+        private const float _yellowMoveInterval = 10f;
+
+        // Překážky
+        private List<Vector2> _obstacles = new List<Vector2>();
+        private List<Vector2> _obstacleDirs = new List<Vector2>();
+        private const int obstacleCount = 5;
+        private float _obstacleSpeed = 100f; // bude dynamická podle dne/noci
+
+        // Speciální nepřítel
+        private Vector2 _specialEnemyPos;
+        private Vector2 _specialEnemyDir;
+        private bool _specialEnemyActive = false;
+        private float _specialEnemyTimer = 0f;
+        private const float _specialEnemyAliveTime = 15f;
+        private float _specialEnemySpeed = 260f;
+        private const int _specialEnemyDamage = 2;
+        private const int _specialEnemyScoreThreshold = 5;
+
+        // Denní cyklus
+        private float _dayTimer = 0f;
+        private const float _dayCycleInterval = 10f;
+        private Color _bgColor = Color.Yellow;
+        private Color _targetBgColor = Color.Goldenrod;
+
+        // Štít
+        private Vector2 _shieldPos;
+        private bool _shieldActive = false;
+        private float _shieldSpawnTimer = 0f;
+        private float _shieldActiveTimer = 0f;
+        private const float _shieldSpawnInterval = 15f;
+        private const float _shieldVisibleDuration = 5f;
+        private const float _shieldEffectDuration = 10f;
+
+        // Hra
+        private int _score = 0;
         private bool _wasColliding = false;
-        private Random _rnd = new Random();
+        private bool _isBlinking = false;
+        private float _blinkTimer = 0f;
+        private float _blinkDuration = 0.5f;
+        private float _blinkInterval = 0.1f;
+        private float _blinkIntervalTimer = 0f;
+        private bool _isVisible = true;
+        private float _knockbackDist = 60f;
 
-        private KeyboardState _previousKeyboardState; // Přidáno pro sledování předchozího stavu klávesnice
+        private Random _rnd = new Random();
 
         public Game1()
         {
             _graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
-
             _graphics.PreferredBackBufferWidth = 800;
             _graphics.PreferredBackBufferHeight = 600;
             _graphics.ApplyChanges();
@@ -37,8 +81,40 @@ namespace Mr.snake
         protected override void Initialize()
         {
             _snake.Clear();
-            _snake.Add(new Vector2(300, 100)); // startovní pozice hlavy hada
-            _redPos = RandomRedPosition();
+            _snake.Add(new Vector2(300, 100));
+            _dir = new Vector2(1, 0);
+
+            _redPos = RandomPosition();
+            _yellowPos = RandomPosition();
+
+            _obstacles.Clear();
+            _obstacleDirs.Clear();
+            for (int i = 0; i < obstacleCount; i++)
+            {
+                _obstacles.Add(RandomPosition());
+                Vector2 dir;
+                do dir = new Vector2(_rnd.Next(-1, 2), _rnd.Next(-1, 2));
+                while (dir == Vector2.Zero);
+                _obstacleDirs.Add(dir);
+            }
+
+            _specialEnemyActive = false;
+            _specialEnemyTimer = 0f;
+
+            _isBlinking = false;
+            _isVisible = true;
+
+            _score = 0;
+            _yellowTimer = 0f;
+
+            _dayTimer = 0f;
+            _bgColor = Color.Yellow;
+            _targetBgColor = Color.Goldenrod;
+
+            _shieldActive = false;
+            _shieldSpawnTimer = 0f;
+            _shieldActiveTimer = 0f;
+
             base.Initialize();
         }
 
@@ -49,96 +125,226 @@ namespace Mr.snake
             _pixel.SetData(new[] { Color.White });
         }
 
-        private Vector2 RandomRedPosition()
+        private Vector2 RandomPosition()
         {
-            int maxX = (_graphics.PreferredBackBufferWidth - velikostctverecku) / velikostctverecku;
-            int maxY = (_graphics.PreferredBackBufferHeight - velikostctverecku) / velikostctverecku;
+            int maxX = (_graphics.PreferredBackBufferWidth - size) / size;
+            int maxY = (_graphics.PreferredBackBufferHeight - size) / size;
             return new Vector2(
-                _rnd.Next(0, maxX + 1) * velikostctverecku,
-                _rnd.Next(0, maxY + 1) * velikostctverecku
+                _rnd.Next(0, maxX + 1) * size,
+                _rnd.Next(0, maxY + 1) * size
             );
         }
 
         protected override void Update(GameTime gameTime)
         {
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             var kstate = Keyboard.GetState();
             if (kstate.IsKeyDown(Keys.Escape))
                 Exit();
 
-            // --- Ovládání šipek ---
+            // Blikání hada
+            if (_isBlinking)
+            {
+                _blinkTimer += dt;
+                _blinkIntervalTimer += dt;
+                if (_blinkIntervalTimer >= _blinkInterval)
+                {
+                    _isVisible = !_isVisible;
+                    _blinkIntervalTimer = 0f;
+                }
+                if (_blinkTimer >= _blinkDuration)
+                {
+                    _isBlinking = false;
+                    _isVisible = true;
+                }
+            }
+
+            // Ovládání hada
             Vector2 move = Vector2.Zero;
             if (kstate.IsKeyDown(Keys.Up)) move = new Vector2(0, -1);
             else if (kstate.IsKeyDown(Keys.Down)) move = new Vector2(0, 1);
             else if (kstate.IsKeyDown(Keys.Left)) move = new Vector2(-1, 0);
             else if (kstate.IsKeyDown(Keys.Right)) move = new Vector2(1, 0);
 
-            // Pokud je stisknutá šipka, nastav směr
             if (move != Vector2.Zero)
                 _dir = move;
 
-            // Pohyb hada pouze pokud je nějaká šipka stisknutá
             if (move != Vector2.Zero)
             {
-                float delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
-                Vector2 newHead = _snake[0] + _dir * rychlost * delta;
+                Vector2 newHead = _snake[0] + _dir * speed * dt;
+                newHead.X = MathHelper.Clamp(newHead.X, 0, _graphics.PreferredBackBufferWidth - size);
+                newHead.Y = MathHelper.Clamp(newHead.Y, 0, _graphics.PreferredBackBufferHeight - size);
 
-                // Okraje obrazovky
-                newHead.X = MathHelper.Clamp(newHead.X, 0, _graphics.PreferredBackBufferWidth - velikostctverecku);
-                newHead.Y = MathHelper.Clamp(newHead.Y, 0, _graphics.PreferredBackBufferHeight - velikostctverecku);
-
-                // Posuň tělo
                 for (int i = _snake.Count - 1; i > 0; i--)
                     _snake[i] = _snake[i - 1];
                 _snake[0] = newHead;
 
-                // --- Kolize s červeným čtverečkem ---
-                Rectangle rectRed = new Rectangle((int)_redPos.X, (int)_redPos.Y, velikostctverecku, velikostctverecku);
-                Rectangle rectHead = new Rectangle((int)_snake[0].X, (int)_snake[0].Y, velikostctverecku, velikostctverecku);
-
-                bool isColliding = rectRed.Intersects(rectHead);
-
-                if (isColliding && !_wasColliding)
+                // Červené jídlo
+                Rectangle rectRed = new Rectangle((int)_redPos.X, (int)_redPos.Y, size, size);
+                Rectangle rectHead = new Rectangle((int)_snake[0].X, (int)_snake[0].Y, size, size);
+                bool redCollision = rectRed.Intersects(rectHead);
+                if (redCollision && !_wasColliding)
                 {
-                    // Prodloužení hada o více segmentů (např. 3)
                     for (int i = 0; i < 3; i++)
                         _snake.Add(_snake[_snake.Count - 1]);
-                    // Nová pozice červeného čtverečku
-                    _redPos = RandomRedPosition();
+                    _redPos = RandomPosition();
+                    _score++;
+
+                    if (_score >= _specialEnemyScoreThreshold && !_specialEnemyActive)
+                    {
+                        _specialEnemyActive = true;
+                        _specialEnemyTimer = 0f;
+                        _specialEnemyPos = RandomPosition();
+                        do
+                        {
+                            _specialEnemyDir = new Vector2(_rnd.Next(-1, 2), _rnd.Next(-1, 2));
+                        } while (_specialEnemyDir == Vector2.Zero);
+                    }
                 }
-                _wasColliding = isColliding;
+                _wasColliding = redCollision;
+
+                // Žluté jídlo
+                Rectangle rectYellow = new Rectangle((int)_yellowPos.X, (int)_yellowPos.Y, size, size);
+                if (rectYellow.Intersects(rectHead))
+                {
+                    for (int i = 0; i < 2; i++)
+                        _snake.Add(_snake[_snake.Count - 1]);
+                    _yellowPos = RandomPosition();
+                    _yellowTimer = 0f;
+                }
+
+                // Kolize s překážkami
+                for (int i = 0; i < _obstacles.Count; i++)
+                {
+                    Rectangle rectObs = new Rectangle((int)_obstacles[i].X, (int)_obstacles[i].Y, size, size);
+                    if (rectObs.Intersects(rectHead) && !_isBlinking && !_shieldActive)
+                    {
+                        if (_snake.Count > 1) _snake.RemoveAt(_snake.Count - 1);
+                        Vector2 knockback = _snake[0] - _dir * _knockbackDist;
+                        knockback.X = MathHelper.Clamp(knockback.X, 0, _graphics.PreferredBackBufferWidth - size);
+                        knockback.Y = MathHelper.Clamp(knockback.Y, 0, _graphics.PreferredBackBufferHeight - size);
+                        _snake[0] = knockback;
+                        _isBlinking = true;
+                        _blinkTimer = 0f;
+                        _blinkIntervalTimer = 0f;
+                        _isVisible = false;
+                    }
+                }
             }
             else
             {
-                _wasColliding = false; // Reset kolize, když se had nehýbe
+                _wasColliding = false;
             }
 
-            _previousKeyboardState = kstate;
+            // Pohyb překážek
+            for (int i = 0; i < _obstacles.Count; i++)
+            {
+                _obstacles[i] += _obstacleDirs[i] * _obstacleSpeed * dt;
+                if (_obstacles[i].X < 0 || _obstacles[i].X > _graphics.PreferredBackBufferWidth - size) _obstacleDirs[i].X *= -1;
+                if (_obstacles[i].Y < 0 || _obstacles[i].Y > _graphics.PreferredBackBufferHeight - size) _obstacleDirs[i].Y *= -1;
+                _obstacles[i].X = MathHelper.Clamp(_obstacles[i].X, 0, _graphics.PreferredBackBufferWidth - size);
+                _obstacles[i].Y = MathHelper.Clamp(_obstacles[i].Y, 0, _graphics.PreferredBackBufferHeight - size);
+            }
+
+            // Speciální nepřítel
+            if (_specialEnemyActive)
+            {
+                _specialEnemyTimer += dt;
+                _specialEnemyPos += _specialEnemyDir * _specialEnemySpeed * dt;
+                if (_specialEnemyPos.X < 0 || _specialEnemyPos.X > _graphics.PreferredBackBufferWidth - size) _specialEnemyDir.X *= -1;
+                if (_specialEnemyPos.Y < 0 || _specialEnemyPos.Y > _graphics.PreferredBackBufferHeight - size) _specialEnemyDir.Y *= -1;
+                _specialEnemyPos.X = MathHelper.Clamp(_specialEnemyPos.X, 0, _graphics.PreferredBackBufferWidth - size);
+                _specialEnemyPos.Y = MathHelper.Clamp(_specialEnemyPos.Y, 0, _graphics.PreferredBackBufferHeight - size);
+
+                if (_specialEnemyTimer >= _specialEnemyAliveTime) _specialEnemyActive = false;
+
+                Rectangle rectSpecial = new Rectangle((int)_specialEnemyPos.X, (int)_specialEnemyPos.Y, size, size);
+                if (rectSpecial.Intersects(new Rectangle((int)_snake[0].X, (int)_snake[0].Y, size, size)) && !_isBlinking && !_shieldActive)
+                {
+                    for (int s = 0; s < 5; s++) if (_snake.Count > 1) _snake.RemoveAt(_snake.Count - 1);
+                    Vector2 knockback = _snake[0] - _dir * _knockbackDist * 2f;
+                    knockback.X = MathHelper.Clamp(knockback.X, 0, _graphics.PreferredBackBufferWidth - size);
+                    knockback.Y = MathHelper.Clamp(knockback.Y, 0, _graphics.PreferredBackBufferHeight - size);
+                    _snake[0] = knockback;
+                    _isBlinking = true;
+                    _blinkTimer = 0f;
+                    _blinkIntervalTimer = 0f;
+                    _isVisible = false;
+                }
+            }
+
+            // Žluté jídlo
+            _yellowTimer += dt;
+            if (_yellowTimer >= _yellowMoveInterval)
+            {
+                _yellowPos = RandomPosition();
+                _yellowTimer = 0f;
+            }
+
+            // Denní cyklus
+            _dayTimer += dt;
+            if (_dayTimer >= _dayCycleInterval)
+            {
+                Color temp = _bgColor;
+                _bgColor = _targetBgColor;
+                _targetBgColor = temp;
+                _dayTimer = 0f;
+
+                // Změna rychlosti nepřátel podle dne/noci
+                _obstacleSpeed = (_bgColor == Color.Yellow) ? 100f : 180f;
+                _specialEnemySpeed = (_bgColor == Color.Yellow) ? 260f : 360f;
+            }
+
+            // Štít
+            _shieldSpawnTimer += dt;
+            if (!_shieldActive && _shieldSpawnTimer >= _shieldSpawnInterval)
+            {
+                _shieldPos = RandomPosition();
+                _shieldActive = true;
+                _shieldActiveTimer = 0f;
+                _shieldSpawnTimer = 0f;
+            }
+            if (_shieldActive)
+            {
+                _shieldActiveTimer += dt;
+                if (_shieldActiveTimer >= _shieldEffectDuration)
+                    _shieldActive = false;
+            }
+
+            // Konec hry pokud had zmizí
+            if (_snake.Count <= 0) Exit();
 
             base.Update(gameTime);
         }
 
         protected override void Draw(GameTime gameTime)
         {
-            GraphicsDevice.Clear(Color.CornflowerBlue);
+            GraphicsDevice.Clear(_bgColor);
             _spriteBatch.Begin();
 
-            // Červený čtvereček
-            _spriteBatch.Draw(
-                _pixel,
-                new Rectangle((int)_redPos.X, (int)_redPos.Y, velikostctverecku, velikostctverecku),
-                Color.Red);
+            // Červené jídlo
+            _spriteBatch.Draw(_pixel, new Rectangle((int)_redPos.X, (int)_redPos.Y, size, size), Color.Red);
+            // Žluté jídlo
+            _spriteBatch.Draw(_pixel, new Rectangle((int)_yellowPos.X, (int)_yellowPos.Y, size, size), Color.Yellow);
 
-            // Had (zelený čtvereček a jeho tělo)
-            for (int i = 0; i < _snake.Count; i++)
-            {
-                _spriteBatch.Draw(
-                    _pixel,
-                    new Rectangle((int)_snake[i].X, (int)_snake[i].Y, velikostctverecku, velikostctverecku),
-                    Color.Green);
-            }
+            // Had
+            if (_isVisible)
+                foreach (var s in _snake)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)s.X, (int)s.Y, size, size), Color.Green);
+
+            // Překážky
+            foreach (var o in _obstacles)
+                _spriteBatch.Draw(_pixel, new Rectangle((int)o.X, (int)o.Y, size, size), Color.Blue);
+
+            // Speciální nepřítel
+            if (_specialEnemyActive)
+                _spriteBatch.Draw(_pixel, new Rectangle((int)_specialEnemyPos.X, (int)_specialEnemyPos.Y, size, size), Color.SaddleBrown);
+
+            // Štít
+            if (_shieldActive)
+                _spriteBatch.Draw(_pixel, new Rectangle((int)_shieldPos.X, (int)_shieldPos.Y, size, size), Color.LightCyan * 0.5f);
 
             _spriteBatch.End();
-            base.Draw(gameTime);
         }
     }
 }
