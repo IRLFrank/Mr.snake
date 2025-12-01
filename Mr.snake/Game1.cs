@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
 
-namespace MrSnake
+namespace Mr_snake  
 {
     public class Game1 : Game
     {
@@ -28,17 +28,7 @@ namespace MrSnake
         private List<Vector2> _obstacles = new List<Vector2>();
         private List<Vector2> _obstacleDirs = new List<Vector2>();
         private const int obstacleCount = 5;
-        private float _obstacleSpeed = 100f; // bude dynamická podle dne/noci
-
-        // Speciální nepřítel
-        private Vector2 _specialEnemyPos;
-        private Vector2 _specialEnemyDir;
-        private bool _specialEnemyActive = false;
-        private float _specialEnemyTimer = 0f;
-        private const float _specialEnemyAliveTime = 15f;
-        private float _specialEnemySpeed = 260f;
-        private const int _specialEnemyDamage = 2;
-        private const int _specialEnemyScoreThreshold = 5;
+        private float _obstacleSpeed = 100f;
 
         // Denní cyklus
         private float _dayTimer = 0f;
@@ -52,7 +42,6 @@ namespace MrSnake
         private float _shieldSpawnTimer = 0f;
         private float _shieldActiveTimer = 0f;
         private const float _shieldSpawnInterval = 15f;
-        private const float _shieldVisibleDuration = 5f;
         private const float _shieldEffectDuration = 10f;
 
         // Hra
@@ -67,6 +56,9 @@ namespace MrSnake
         private float _knockbackDist = 60f;
 
         private Random _rnd = new Random();
+
+        // Speciální nepřítel jako objekt
+        private SpecialEnemy _specialEnemy;
 
         public Game1()
         {
@@ -98,8 +90,7 @@ namespace MrSnake
                 _obstacleDirs.Add(dir);
             }
 
-            _specialEnemyActive = false;
-            _specialEnemyTimer = 0f;
+            _specialEnemy = new SpecialEnemy(_rnd, size, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
 
             _isBlinking = false;
             _isVisible = true;
@@ -190,15 +181,9 @@ namespace MrSnake
                     _redPos = RandomPosition();
                     _score++;
 
-                    if (_score >= _specialEnemyScoreThreshold && !_specialEnemyActive)
+                    if (_score >= _specialEnemy.ScoreThreshold)
                     {
-                        _specialEnemyActive = true;
-                        _specialEnemyTimer = 0f;
-                        _specialEnemyPos = RandomPosition();
-                        do
-                        {
-                            _specialEnemyDir = new Vector2(_rnd.Next(-1, 2), _rnd.Next(-1, 2));
-                        } while (_specialEnemyDir == Vector2.Zero);
+                        _specialEnemy.Activate();
                     }
                 }
                 _wasColliding = redCollision;
@@ -239,39 +224,25 @@ namespace MrSnake
             // Pohyb překážek
             for (int i = 0; i < _obstacles.Count; i++)
             {
-                _obstacles[i] += _obstacleDirs[i] * _obstacleSpeed * dt;
-                if (_obstacles[i].X < 0 || _obstacles[i].X > _graphics.PreferredBackBufferWidth - size) _obstacleDirs[i].X *= -1;
-                if (_obstacles[i].Y < 0 || _obstacles[i].Y > _graphics.PreferredBackBufferHeight - size) _obstacleDirs[i].Y *= -1;
-                _obstacles[i].X = MathHelper.Clamp(_obstacles[i].X, 0, _graphics.PreferredBackBufferWidth - size);
-                _obstacles[i].Y = MathHelper.Clamp(_obstacles[i].Y, 0, _graphics.PreferredBackBufferHeight - size);
+                Vector2 pos = _obstacles[i];
+                Vector2 dir = _obstacleDirs[i];
+
+                pos += dir * _obstacleSpeed * dt;
+
+                if (pos.X < 0 || pos.X > _graphics.PreferredBackBufferWidth - size)
+                    dir.X *= -1;
+                if (pos.Y < 0 || pos.Y > _graphics.PreferredBackBufferHeight - size)
+                    dir.Y *= -1;
+
+                pos.X = MathHelper.Clamp(pos.X, 0, _graphics.PreferredBackBufferWidth - size);
+                pos.Y = MathHelper.Clamp(pos.Y, 0, _graphics.PreferredBackBufferHeight - size);
+
+                _obstacles[i] = pos;
+                _obstacleDirs[i] = dir;
             }
 
             // Speciální nepřítel
-            if (_specialEnemyActive)
-            {
-                _specialEnemyTimer += dt;
-                _specialEnemyPos += _specialEnemyDir * _specialEnemySpeed * dt;
-                if (_specialEnemyPos.X < 0 || _specialEnemyPos.X > _graphics.PreferredBackBufferWidth - size) _specialEnemyDir.X *= -1;
-                if (_specialEnemyPos.Y < 0 || _specialEnemyPos.Y > _graphics.PreferredBackBufferHeight - size) _specialEnemyDir.Y *= -1;
-                _specialEnemyPos.X = MathHelper.Clamp(_specialEnemyPos.X, 0, _graphics.PreferredBackBufferWidth - size);
-                _specialEnemyPos.Y = MathHelper.Clamp(_specialEnemyPos.Y, 0, _graphics.PreferredBackBufferHeight - size);
-
-                if (_specialEnemyTimer >= _specialEnemyAliveTime) _specialEnemyActive = false;
-
-                Rectangle rectSpecial = new Rectangle((int)_specialEnemyPos.X, (int)_specialEnemyPos.Y, size, size);
-                if (rectSpecial.Intersects(new Rectangle((int)_snake[0].X, (int)_snake[0].Y, size, size)) && !_isBlinking && !_shieldActive)
-                {
-                    for (int s = 0; s < 5; s++) if (_snake.Count > 1) _snake.RemoveAt(_snake.Count - 1);
-                    Vector2 knockback = _snake[0] - _dir * _knockbackDist * 2f;
-                    knockback.X = MathHelper.Clamp(knockback.X, 0, _graphics.PreferredBackBufferWidth - size);
-                    knockback.Y = MathHelper.Clamp(knockback.Y, 0, _graphics.PreferredBackBufferHeight - size);
-                    _snake[0] = knockback;
-                    _isBlinking = true;
-                    _blinkTimer = 0f;
-                    _blinkIntervalTimer = 0f;
-                    _isVisible = false;
-                }
-            }
+            _specialEnemy.Update(dt, _snake[0], _dir, ref _isBlinking, ref _isVisible, ref _snake, _knockbackDist, this);
 
             // Žluté jídlo
             _yellowTimer += dt;
@@ -292,7 +263,7 @@ namespace MrSnake
 
                 // Změna rychlosti nepřátel podle dne/noci
                 _obstacleSpeed = (_bgColor == Color.Yellow) ? 100f : 180f;
-                _specialEnemySpeed = (_bgColor == Color.Yellow) ? 260f : 360f;
+                _specialEnemy.Speed = (_bgColor == Color.Yellow) ? 50f : 70f; // Snížená rychlost fialového enemy
             }
 
             // Štít
@@ -337,8 +308,7 @@ namespace MrSnake
                 _spriteBatch.Draw(_pixel, new Rectangle((int)o.X, (int)o.Y, size, size), Color.Blue);
 
             // Speciální nepřítel
-            if (_specialEnemyActive)
-                _spriteBatch.Draw(_pixel, new Rectangle((int)_specialEnemyPos.X, (int)_specialEnemyPos.Y, size, size), Color.SaddleBrown);
+            _specialEnemy.Draw(_spriteBatch, _pixel);
 
             // Štít
             if (_shieldActive)
